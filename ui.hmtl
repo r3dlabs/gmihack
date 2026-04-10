@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMI MaaS Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body.light-mode { background-color: #f3f4f6; color: #1f2937; }
+        .light-mode .bg-card { background-color: #ffffff; border-color: #e5e7eb; }
+        .light-mode .bg-input { background-color: #f9fafb; color: #111827; border-color: #d1d5db; }
+        .light-mode .user-msg { background-color: #dbeafe; color: #1e3a8a; }
+        .light-mode .ai-msg { background-color: #f3f4f6; color: #374151; }
+
+        body.dark-mode { background-color: #0f172a; color: #f8fafc; }
+        .dark-mode .bg-card { background-color: #1e293b; border-color: #334155; }
+        .dark-mode .bg-input { background-color: #0f172a; color: #f8fafc; border-color: #475569; }
+        .dark-mode .user-msg { background-color: #1e40af; color: #eff6ff; }
+        .dark-mode .ai-msg { background-color: #334155; color: #f1f5f9; }
+
+        #chatHistory { height: calc(100vh - 380px); }
+        .transition-theme { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="dark-mode transition-theme h-screen flex flex-col overflow-hidden">
+
+    <header class="bg-card border-b p-4 flex justify-between items-center shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg text-white font-black text-xl">GMI</div>
+            <div>
+                <h1 class="font-bold text-lg leading-none">MaaS Tester</h1>
+                <span class="text-xs opacity-60">GLM-5.1 Inference Engine</span>
+            </div>
+        </div>
+        
+        <div class="flex gap-2">
+            <button onclick="toggleTheme()" class="p-2 rounded-full border bg-card hover:opacity-80 transition-theme" id="themeBtn">
+                🌙
+            </button>
+            <button onclick="clearChat()" class="text-xs uppercase font-bold px-4 py-2 rounded-lg border border-red-500/50 text-red-500 hover:bg-red-500/10">
+                Clear Chat
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-6xl mx-auto w-full p-4 md:p-6 flex flex-col gap-4 overflow-hidden">
+        
+        <section class="bg-card border rounded-2xl p-4 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-bold uppercase opacity-50 ml-1">GMI API Key</label>
+                <input type="password" id="apiKey" placeholder="gmi_sk_..." class="bg-input border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-bold uppercase opacity-50 ml-1">Endpoint</label>
+                <input type="text" id="baseUrl" value="https://api.gmicloud.ai/v1" class="bg-input border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div class="flex flex-col gap-1">
+                <label class="text-[10px] font-bold uppercase opacity-50 ml-1">Model ID</label>
+                <div class="flex gap-2">
+                    <input type="text" id="modelId" value="zai-org/GLM-5.1" class="flex-1 bg-input border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <button onclick="saveConfig()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-blue-500">Save</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="flex-1 bg-card border rounded-2xl shadow-sm flex flex-col overflow-hidden">
+            <div id="chatHistory" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth">
+                <div class="text-center opacity-40 mt-20">
+                    <p class="text-2xl">⚡</p>
+                    <p>Enter your configuration and start the hack.</p>
+                </div>
+            </div>
+
+            <div class="p-4 border-t bg-card/50">
+                <div class="flex items-end gap-3 max-w-4xl mx-auto">
+                    <textarea id="userInput" rows="1" 
+                        oninput="this.style.height = '';this.style.height = this.scrollHeight + 'px'"
+                        placeholder="Type your prompt for GLM-5.1..." 
+                        class="flex-1 bg-input border rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 resize-none max-h-48 transition-all"></textarea>
+                    <button id="sendBtn" onclick="sendMessage()" class="bg-blue-600 hover:bg-blue-500 text-white p-3 rounded-2xl shadow-lg transition-transform active:scale-95">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-[10px] text-center mt-2 opacity-40 italic">GLM-5.1 supports a 200k context window.</p>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        let messages = [];
+
+        window.onload = () => {
+            const savedKey = localStorage.getItem('gmi_key');
+            const savedUrl = localStorage.getItem('gmi_url');
+            const savedTheme = localStorage.getItem('theme') || 'dark-mode';
+            
+            if(savedKey) document.getElementById('apiKey').value = savedKey;
+            if(savedUrl) document.getElementById('baseUrl').value = savedUrl;
+            
+            document.body.className = `${savedTheme} transition-theme h-screen flex flex-col overflow-hidden`;
+            document.getElementById('themeBtn').innerText = savedTheme === 'dark-mode' ? '🌙' : '☀️';
+        };
+
+        function toggleTheme() {
+            const isDark = document.body.classList.contains('dark-mode');
+            const newTheme = isDark ? 'light-mode' : 'dark-mode';
+            document.body.classList.remove('dark-mode', 'light-mode');
+            document.body.classList.add(newTheme);
+            document.getElementById('themeBtn').innerText = isDark ? '☀️' : '🌙';
+            localStorage.setItem('theme', newTheme);
+        }
+
+        function saveConfig() {
+            localStorage.setItem('gmi_key', document.getElementById('apiKey').value);
+            localStorage.setItem('gmi_url', document.getElementById('baseUrl').value);
+            alert("Settings cached!");
+        }
+
+        function clearChat() {
+            messages = [];
+            document.getElementById('chatHistory').innerHTML = '<div class="text-center opacity-40 mt-20"><p>Chat cleared. Ready for a new prompt.</p></div>';
+        }
+
+        async function sendMessage() {
+            const apiKey = document.getElementById('apiKey').value;
+            const baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/+$/, '');
+            const model = document.getElementById('modelId').value;
+            const text = document.getElementById('userInput').value;
+            const sendBtn = document.getElementById('sendBtn');
+
+            if (!text || !apiKey) return;
+
+            // UI: Append User Message
+            appendUI('user', text);
+            messages.push({ role: "user", content: text });
+            document.getElementById('userInput').value = '';
+            document.getElementById('userInput').style.height = 'auto';
+
+            // UI: Placeholder for AI
+            sendBtn.disabled = true;
+            const aiBubble = appendUI('assistant', 'Generating thoughts...');
+
+            try {
+                const res = await fetch(`${baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({ model, messages, temperature: 0.7 })
+                });
+
+                const data = await res.json();
+                const reply = data.choices[0].message.content;
+                aiBubble.innerText = reply;
+                messages.push({ role: "assistant", content: reply });
+            } catch (err) {
+                aiBubble.innerText = "Error: Check your API key or console.";
+                console.error(err);
+            } finally {
+                sendBtn.disabled = false;
+            }
+        }
+
+        function appendUI(role, text) {
+            const history = document.getElementById('chatHistory');
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `p-4 rounded-2xl max-w-[80%] whitespace-pre-wrap text-sm shadow-sm ${role === 'user' ? 'user-msg rounded-tr-none' : 'ai-msg rounded-tl-none border'}`;
+            bubble.innerText = text;
+            
+            wrapper.appendChild(bubble);
+            history.appendChild(wrapper);
+            history.scrollTop = history.scrollHeight;
+            return bubble;
+        }
+    </script>
+</body>
+</html>
